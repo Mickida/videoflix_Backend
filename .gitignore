@@ -1,0 +1,26 @@
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Editor
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Uploaded and generated files
+media/
+static/
+
+# Coverage
+htmlcov/
+.coverage
+
+# Own tests
+*/tests/
+*/api/tests.py
