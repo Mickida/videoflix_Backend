@@ -9,8 +9,8 @@ class RegistrationSerializer(serializers.Serializer):
     """Validate registration data and create an inactive user."""
 
     email = serializers.EmailField(max_length=150)
-    password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
-    confirmed_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password = serializers.CharField(write_only=True, min_length=8, max_length=128, trim_whitespace=False)
+    confirmed_password = serializers.CharField(write_only=True, max_length=128, trim_whitespace=False)
 
     def validate_email(self, value):
         """Store emails in lowercase."""
@@ -34,3 +34,10 @@ class RegistrationSerializer(serializers.Serializer):
                 )
         except IntegrityError:
             raise serializers.ValidationError(GENERIC_ERROR)
+
+
+class LoginSerializer(serializers.Serializer):
+    """Validate the presence of login credentials."""
+
+    email = serializers.EmailField(max_length=150)
+    password = serializers.CharField(write_only=True, max_length=128, trim_whitespace=False)
