@@ -1,12 +1,19 @@
+import logging
+
 import django_rq
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from redis.exceptions import RedisError
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from auth_app.tasks import send_activation_email
+from auth_app.tasks import send_activation_email, send_password_reset_email
+
+logger = logging.getLogger(__name__)
 
 ACCESS_COOKIE = 'access_token'
 REFRESH_COOKIE = 'refresh_token'
@@ -24,6 +31,20 @@ def queue_activation_email(user, token):
     """Put the activation email for the user into the task queue."""
     link = build_frontend_link('activate.html', user, token)
     django_rq.enqueue(send_activation_email, user.email, link)
+
+
+def queue_password_reset_email(email):
+    """Queue a reset email if an active user with this email exists."""
+    user = User.objects.filter(username=email.lower(), is_active=True).first()
+    if user is None:
+        return
+    token = default_token_generator.make_token(user)
+    link = build_frontend_link('confirm_password.html', user, token)
+    try:
+        django_rq.enqueue(send_password_reset_email, user.email, link)
+    except RedisError:
+        # Keep the answer identical, so an outage does not reveal the email.
+        logger.exception('Could not queue the password reset email.')
 
 
 def get_user_from_uidb64(uidb64):
@@ -60,3 +81,9 @@ def delete_token_cookies(response):
     """Remove both JWT cookies from the browser."""
     for name in (ACCESS_COOKIE, REFRESH_COOKIE):
         response.delete_cookie(name, samesite=COOKIE_SAMESITE)
+
+
+def blacklist_all_refresh_tokens(user):
+    """Blacklist every refresh token that was issued to the user."""
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)

@@ -34,3 +34,8 @@ def send_activation_email(email, activation_link):
     """Send the account activation email."""
     context = {'name': email.split('@')[0], 'link': activation_link}
     send_html_email('Confirm your email', email, 'activation', context)
+
+
+def send_password_reset_email(email, reset_link):
+    """Send the password reset email."""
+    send_html_email('Reset your Password', email, 'password_reset', {'link': reset_link})

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User, update_last_login
+from django.contrib.auth.tokens import default_token_generator
 from django.db import transaction
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -9,15 +10,23 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from auth_app.api.serializers import GENERIC_ERROR, LoginSerializer, RegistrationSerializer
+from auth_app.api.serializers import (
+    GENERIC_ERROR,
+    LoginSerializer,
+    PasswordConfirmSerializer,
+    PasswordResetSerializer,
+    RegistrationSerializer,
+)
 from auth_app.tokens import account_activation_token
 from auth_app.utils import (
     ACCESS_COOKIE,
     REFRESH_COOKIE,
+    blacklist_all_refresh_tokens,
     blacklist_refresh_token,
     delete_token_cookies,
     get_user_from_uidb64,
     queue_activation_email,
+    queue_password_reset_email,
     set_token_cookie,
 )
 
@@ -25,6 +34,9 @@ from auth_app.utils import (
 LOGOUT_MESSAGE = 'Logout successful! All tokens will be deleted. Refresh token is now invalid.'
 MISSING_REFRESH_TOKEN = 'Refresh token missing.'
 INVALID_REFRESH_TOKEN = 'Invalid refresh token.'
+RESET_EMAIL_SENT = 'An email has been sent to reset your password.'
+INVALID_RESET_LINK = 'Invalid or expired reset link.'
+PASSWORD_RESET_DONE = 'Your Password has been successfully reset.'
 
 
 class RegistrationView(APIView):
@@ -153,3 +165,52 @@ class LogoutView(APIView):
         if not blacklist_refresh_token(raw_token):
             return Response({'detail': INVALID_REFRESH_TOKEN}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'detail': LOGOUT_MESSAGE})
+
+
+class PasswordResetView(APIView):
+    """Send a password reset link without revealing if the email exists."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_scope = 'password_reset'
+
+    def post(self, request):
+        """Queue the reset email and always return the same answer."""
+        serializer = PasswordResetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        queue_password_reset_email(serializer.validated_data['email'])
+        return Response({'detail': RESET_EMAIL_SENT})
+
+
+class PasswordConfirmView(APIView):
+    """Set a new password with the link from the reset email."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_scope = 'password_confirm'
+
+    def post(self, request, uidb64, token):
+        """Check the link and save the new password."""
+        user = self.get_user_for_link(uidb64, token)
+        if user is None:
+            return Response({'detail': INVALID_RESET_LINK}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = PasswordConfirmSerializer(data=request.data, context={'user': user})
+        serializer.is_valid(raise_exception=True)
+        self.save_new_password(user, serializer.validated_data['new_password'])
+        return Response({'detail': PASSWORD_RESET_DONE})
+
+    def get_user_for_link(self, uidb64, token):
+        """Return the active user of a valid reset link, otherwise None."""
+        user = get_user_from_uidb64(uidb64)
+        if user is None or not user.is_active:
+            return None
+        if not default_token_generator.check_token(user, token):
+            return None
+        return user
+
+    def save_new_password(self, user, password):
+        """Save the password and log the user out everywhere."""
+        with transaction.atomic():
+            user.set_password(password)
+            user.save(update_fields=['password'])
+            blacklist_all_refresh_tokens(user)
