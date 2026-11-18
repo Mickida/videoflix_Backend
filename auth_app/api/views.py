@@ -1,11 +1,12 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import update_last_login
+from django.contrib.auth.models import User, update_last_login
 from django.db import transaction
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from auth_app.api.serializers import GENERIC_ERROR, LoginSerializer, RegistrationSerializer
@@ -13,10 +14,17 @@ from auth_app.tokens import account_activation_token
 from auth_app.utils import (
     ACCESS_COOKIE,
     REFRESH_COOKIE,
+    blacklist_refresh_token,
+    delete_token_cookies,
     get_user_from_uidb64,
     queue_activation_email,
     set_token_cookie,
 )
+
+
+LOGOUT_MESSAGE = 'Logout successful! All tokens will be deleted. Refresh token is now invalid.'
+MISSING_REFRESH_TOKEN = 'Refresh token missing.'
+INVALID_REFRESH_TOKEN = 'Invalid refresh token.'
 
 
 class RegistrationView(APIView):
@@ -94,3 +102,54 @@ class LoginView(APIView):
         set_token_cookie(response, ACCESS_COOKIE, refresh.access_token, jwt['ACCESS_TOKEN_LIFETIME'])
         set_token_cookie(response, REFRESH_COOKIE, refresh, jwt['REFRESH_TOKEN_LIFETIME'])
         return response
+
+
+class CookieTokenRefreshView(APIView):
+    """Issue a new access token from the refresh_token cookie."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """Set a new access_token cookie if the refresh token is valid."""
+        raw_token = request.COOKIES.get(REFRESH_COOKIE)
+        if raw_token is None:
+            return Response({'detail': MISSING_REFRESH_TOKEN}, status=status.HTTP_400_BAD_REQUEST)
+        refresh = self.get_valid_refresh_token(raw_token)
+        if refresh is None:
+            return Response({'detail': INVALID_REFRESH_TOKEN}, status=status.HTTP_401_UNAUTHORIZED)
+        access = refresh.access_token
+        response = Response({'detail': 'Token refreshed', 'access': str(access)})
+        set_token_cookie(response, ACCESS_COOKIE, access, settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'])
+        return response
+
+    def get_valid_refresh_token(self, raw_token):
+        """Return the refresh token if it is valid and its user is active, otherwise None."""
+        try:
+            refresh = RefreshToken(raw_token)
+        except TokenError:
+            return None
+        if not User.objects.filter(pk=refresh['user_id'], is_active=True).exists():
+            return None
+        return refresh
+
+
+class LogoutView(APIView):
+    """Blacklist the refresh token and delete both JWT cookies."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """Log the user out; the cookies are deleted in every case."""
+        response = self.build_logout_response(request.COOKIES.get(REFRESH_COOKIE))
+        delete_token_cookies(response)
+        return response
+
+    def build_logout_response(self, raw_token):
+        """Return the response that matches the state of the refresh token."""
+        if raw_token is None:
+            return Response({'detail': MISSING_REFRESH_TOKEN}, status=status.HTTP_400_BAD_REQUEST)
+        if not blacklist_refresh_token(raw_token):
+            return Response({'detail': INVALID_REFRESH_TOKEN}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': LOGOUT_MESSAGE})
