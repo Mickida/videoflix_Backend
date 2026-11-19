@@ -5,7 +5,8 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from video_app.models import Video
-from video_app.utils import delete_video_files, queue_conversion
+from video_app.tasks import queue_conversion
+from video_app.utils import delete_video_files
 
 
 @receiver(post_save, sender=Video)
