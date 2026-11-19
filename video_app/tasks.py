@@ -11,6 +11,7 @@ from video_app.utils import (
     RESOLUTIONS,
     build_hls_command,
     build_thumbnail_command,
+    clear_video_list_cache,
     get_hls_dir,
     get_thumbnail_name,
     run_ffmpeg,
@@ -54,6 +55,8 @@ def convert_video(video_id):
 def set_status(video_id, status):
     """Save a new conversion status; does nothing if the video is gone."""
     Video.objects.filter(id=video_id).update(status=status)
+    # update() sends no post_save signal, so the cache is cleared here.
+    clear_video_list_cache()
 
 
 def create_thumbnail(video):

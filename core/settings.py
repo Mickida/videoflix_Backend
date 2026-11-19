@@ -99,11 +99,17 @@ CACHES = {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.environ.get("REDIS_LOCATION", default="redis://redis:6379/1"),
         "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient"
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # If Redis is down, the cache acts as empty and the database answers.
+            "IGNORE_EXCEPTIONS": True,
+            "SOCKET_CONNECT_TIMEOUT": 2,
+            "SOCKET_TIMEOUT": 2,
         },
         "KEY_PREFIX": "videoflix"
     }
 }
+
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 RQ_QUEUES = {
     'default': {
@@ -189,6 +195,8 @@ REST_FRAMEWORK = {
         'login': '10/min',
         'password_reset': '5/hour',
         'password_confirm': '10/min',
+        # HLS players load many segments at once (start, seeking, resolution switch).
+        'video': '600/min',
     },
 }
 

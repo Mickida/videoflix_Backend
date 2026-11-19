@@ -6,7 +6,13 @@ from django.dispatch import receiver
 
 from video_app.models import Video
 from video_app.tasks import queue_conversion
-from video_app.utils import delete_video_files
+from video_app.utils import clear_video_list_cache, delete_video_files
+
+
+@receiver([post_save, post_delete], sender=Video)
+def clear_cache_on_change(sender, **kwargs):
+    """Drop the cached video list once a change of a video is committed."""
+    transaction.on_commit(clear_video_list_cache)
 
 
 @receiver(post_save, sender=Video)
