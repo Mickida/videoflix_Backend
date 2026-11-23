@@ -1,4 +1,3 @@
-from email.message import MIMEPart
 from pathlib import Path
 
 from django.conf import settings
@@ -8,25 +7,28 @@ from django.template.loader import render_to_string
 LOGO_PATH = Path(__file__).resolve().parent / 'assets' / 'logo.png'
 
 
-def build_logo_attachment():
-    """Return the Videoflix logo as an inline image for HTML emails."""
-    logo = MIMEPart()
-    logo.set_content(
-        LOGO_PATH.read_bytes(), maintype='image', subtype='png',
-        disposition='inline', filename='logo.png', cid='<logo>',
-    )
-    return logo
+class LogoEmail(EmailMultiAlternatives):
+    """HTML email that carries the logo inside the HTML part, not as an attachment."""
+
+    def message(self, **kwargs):
+        """Build the email and embed the logo next to the HTML body."""
+        msg = super().message(**kwargs)
+        html_part = msg.get_body(preferencelist=('html',))
+        html_part.add_related(
+            LOGO_PATH.read_bytes(), maintype='image', subtype='png',
+            disposition='inline', cid='<logo@videoflix>',
+        )
+        # RFC 2387: the related part names the type of its main part.
+        html_part.set_param('type', 'text/html')
+        return msg
 
 
 def send_html_email(subject, recipient, template_name, context):
     """Send an email with an HTML body, a text fallback and the logo."""
     text_body = render_to_string(f'emails/{template_name}.txt', context)
     html_body = render_to_string(f'emails/{template_name}.html', context)
-    message = EmailMultiAlternatives(
-        subject, text_body, settings.DEFAULT_FROM_EMAIL, [recipient]
-    )
+    message = LogoEmail(subject, text_body, settings.DEFAULT_FROM_EMAIL, [recipient])
     message.attach_alternative(html_body, 'text/html')
-    message.attach(build_logo_attachment())
     message.send()
 
 
