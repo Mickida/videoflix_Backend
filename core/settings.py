@@ -100,16 +100,10 @@ CACHES = {
         "LOCATION": os.environ.get("REDIS_LOCATION", default="redis://redis:6379/1"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            # If Redis is down, the cache acts as empty and the database answers.
-            "IGNORE_EXCEPTIONS": True,
-            "SOCKET_CONNECT_TIMEOUT": 2,
-            "SOCKET_TIMEOUT": 2,
         },
         "KEY_PREFIX": "videoflix"
     }
 }
-
-DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 RQ_QUEUES = {
     'default': {

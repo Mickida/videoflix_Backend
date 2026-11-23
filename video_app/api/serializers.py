@@ -9,6 +9,8 @@ class VideoSerializer(serializers.ModelSerializer):
     thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
+        """Fields in the order of the API documentation."""
+
         model = Video
         fields = ['id', 'created_at', 'title', 'description', 'thumbnail_url', 'category']
 

@@ -1,28 +1,16 @@
 from django.http import FileResponse, Http404
 from django.views.static import serve
-from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from video_app.utils import (
     SEGMENT_PATTERN,
+    IgnoreAcceptHeader,
     ensure_video_ready,
     get_thumbnail_dir,
     get_video_list_data,
     open_hls_file,
 )
-
-
-class IgnoreAcceptHeader(BaseContentNegotiation):
-    """Always use the first renderer, so HLS players never get a 406."""
-
-    def select_parser(self, request, parsers):
-        """Return the first parser."""
-        return parsers[0]
-
-    def select_renderer(self, request, renderers, format_suffix=None):
-        """Return the first renderer, whatever the Accept header says."""
-        return renderers[0], renderers[0].media_type
 
 
 class VideoListView(APIView):

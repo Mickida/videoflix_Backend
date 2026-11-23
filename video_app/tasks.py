@@ -4,7 +4,6 @@ from pathlib import Path
 
 import django_rq
 from django.conf import settings
-from redis.exceptions import RedisError
 
 from video_app.models import Video
 from video_app.utils import (
@@ -23,12 +22,8 @@ MAX_LOGGED_STDERR = 2000
 
 
 def queue_conversion(video_id):
-    """Queue the conversion job; mark the video as failed if Redis is down."""
-    try:
-        django_rq.enqueue(convert_video, video_id)
-    except RedisError:
-        logger.exception('Could not queue the conversion of video %s.', video_id)
-        Video.objects.filter(id=video_id).update(status=Video.Status.FAILED)
+    """Put the conversion job for the video into the task queue."""
+    django_rq.enqueue(convert_video, video_id)
 
 
 def convert_video(video_id):
@@ -37,19 +32,24 @@ def convert_video(video_id):
     if video is None:
         return
     set_status(video_id, Video.Status.PROCESSING)
+    run_conversion(video)
+
+
+def run_conversion(video):
+    """Create thumbnail and streams, then save the status ready or failed."""
     try:
         create_thumbnail(video)
         create_hls_streams(video)
     except subprocess.CalledProcessError as error:
-        logger.error('FFmpeg failed for video %s: %s', video_id, error.stderr[-MAX_LOGGED_STDERR:])
-        set_status(video_id, Video.Status.FAILED)
+        logger.error('FFmpeg failed for video %s: %s', video.id, error.stderr[-MAX_LOGGED_STDERR:])
+        set_status(video.id, Video.Status.FAILED)
         return
     except Exception:
         # Also covers the RQ job timeout; re-raise so RQ lists the job as failed.
-        logger.exception('Conversion of video %s crashed.', video_id)
-        set_status(video_id, Video.Status.FAILED)
+        logger.exception('Conversion of video %s crashed.', video.id)
+        set_status(video.id, Video.Status.FAILED)
         raise
-    set_status(video_id, Video.Status.READY)
+    set_status(video.id, Video.Status.READY)
 
 
 def set_status(video_id, status):

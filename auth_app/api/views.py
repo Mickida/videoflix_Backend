@@ -20,7 +20,13 @@ from auth_app.api.serializers import (
 from auth_app.tokens import account_activation_token
 from auth_app.utils import (
     ACCESS_COOKIE,
+    INVALID_REFRESH_TOKEN,
+    INVALID_RESET_LINK,
+    LOGOUT_MESSAGE,
+    MISSING_REFRESH_TOKEN,
+    PASSWORD_RESET_DONE,
     REFRESH_COOKIE,
+    RESET_EMAIL_SENT,
     blacklist_all_refresh_tokens,
     blacklist_refresh_token,
     delete_token_cookies,
@@ -29,14 +35,6 @@ from auth_app.utils import (
     queue_password_reset_email,
     set_token_cookie,
 )
-
-
-LOGOUT_MESSAGE = 'Logout successful! All tokens will be deleted. Refresh token is now invalid.'
-MISSING_REFRESH_TOKEN = 'Refresh token missing.'
-INVALID_REFRESH_TOKEN = 'Invalid refresh token.'
-RESET_EMAIL_SENT = 'An email has been sent to reset your password.'
-INVALID_RESET_LINK = 'Invalid or expired reset link.'
-PASSWORD_RESET_DONE = 'Your Password has been successfully reset.'
 
 
 class RegistrationView(APIView):

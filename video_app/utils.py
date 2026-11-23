@@ -6,6 +6,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.http import Http404
+from rest_framework.negotiation import BaseContentNegotiation
 
 from video_app.api.serializers import VideoSerializer
 from video_app.models import Video
@@ -16,6 +17,18 @@ SEGMENT_SECONDS = 6
 SEGMENT_PATTERN = re.compile(r'\d{3,}\.ts', re.ASCII)
 VIDEO_LIST_CACHE_KEY = 'video_list'
 VIDEO_LIST_CACHE_SECONDS = 60 * 15
+
+
+class IgnoreAcceptHeader(BaseContentNegotiation):
+    """Always use the first renderer, so HLS players never get a 406."""
+
+    def select_parser(self, request, parsers):
+        """Return the first parser."""
+        return parsers[0]
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        """Return the first renderer, whatever the Accept header says."""
+        return renderers[0], renderers[0].media_type
 
 
 def get_hls_dir(video_id):

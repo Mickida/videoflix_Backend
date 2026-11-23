@@ -2,6 +2,8 @@ from django.apps import AppConfig
 
 
 class VideoAppConfig(AppConfig):
+    """Configuration of the app for videos and streaming."""
+
     name = 'video_app'
 
     def ready(self):

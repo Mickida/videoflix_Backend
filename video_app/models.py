@@ -8,6 +8,8 @@ class Video(models.Model):
     """A video that is uploaded in the admin and streamed as HLS."""
 
     class Category(models.TextChoices):
+        """Genres the dashboard groups the videos by."""
+
         ACTION = 'Action'
         COMEDY = 'Comedy'
         DOCUMENTARY = 'Documentary'
@@ -17,6 +19,8 @@ class Video(models.Model):
         SCI_FI = 'Sci-Fi', 'Sci-Fi'
 
     class Status(models.TextChoices):
+        """Steps of the HLS conversion."""
+
         PENDING = 'pending', 'Pending'
         PROCESSING = 'processing', 'Processing'
         READY = 'ready', 'Ready'
@@ -34,6 +38,8 @@ class Video(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        """Newest videos first."""
+
         ordering = ['-created_at']
 
     def __str__(self):
