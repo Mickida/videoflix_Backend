@@ -84,16 +84,16 @@ class LoginView(APIView):
 
     def post(self, request):
         """Check the credentials and return the user data."""
-        user = self.authenticate_user(request)
-        if user is None:
-            return Response({'detail': GENERIC_ERROR}, status=status.HTTP_400_BAD_REQUEST)
-        return self.build_login_response(user)
-
-    def authenticate_user(self, request):
-        """Return the active user for valid credentials, otherwise None."""
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
-            return None
+            return Response({'detail': GENERIC_ERROR}, status=status.HTTP_400_BAD_REQUEST)
+        user = self.authenticate_user(request, serializer)
+        if user is None:
+            return Response({'detail': GENERIC_ERROR}, status=status.HTTP_401_UNAUTHORIZED)
+        return self.build_login_response(user)
+
+    def authenticate_user(self, request, serializer):
+        """Return the active user for valid credentials, otherwise None."""
         return authenticate(
             request,
             username=serializer.validated_data['email'].lower(),
